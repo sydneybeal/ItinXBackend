@@ -31,12 +31,53 @@ public class Day implements Serializable{
         
     }
     
-    public boolean getPrivate()
-    {
+    public boolean getPrivate(){
         return isPrivate;
     }
     public void setPrivate(boolean in){
         isPrivate = in;
+    }
+    
+    public String getDayHeader(){
+        return dayHeader;
+    }
+    public void setDayHeader(String in){
+        dayHeader = in;
+    }
+    
+    public String getHeader(){
+        return header;
+    }
+    public void setHeader(String in){
+        header = in;
+    }
+    
+    public String getBody(){
+        return body;
+    }
+    public void setBody(String in){
+        body = in;
+    }
+    
+    public String getProp(){
+        return prop;
+    }
+    public void setProp(String in){
+        prop = in;
+    }
+    
+    public String getRoom(){
+        return room;
+    }
+    public void setRoom(String in){
+        room = in;
+    }
+    
+    public String getWeb(){
+        return web;
+    }
+    public void setWeb(String in){
+        web = in;
     }
     
     public String getMeals(){
@@ -45,8 +86,6 @@ public class Day implements Serializable{
     public void setMeals(String in){
         meals = in;
     }
-    
-    
     
     
 }
