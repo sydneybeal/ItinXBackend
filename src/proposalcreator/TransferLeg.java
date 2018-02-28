@@ -33,10 +33,10 @@ public class TransferLeg implements Serializable{
         return to;
     }
     
-    public void setType(String inmode){
+    public void setMode(String inmode){
         mode=inmode;
     }
-    public String getType(){
+    public String getMode(){
         return mode;
     }
 }

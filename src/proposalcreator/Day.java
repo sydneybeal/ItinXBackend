@@ -24,6 +24,7 @@ public class Day implements Serializable{
     String prop;
     String room;
     String web;
+    
     String meals;
     
     Day(){

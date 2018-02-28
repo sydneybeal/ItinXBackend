@@ -4,10 +4,15 @@
 package proposalcreator;
 
 import java.io.*;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.text.similarity.LevenshteinDistance;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 /**
  *
@@ -18,6 +23,128 @@ public class ProposalCreator {
 
     static Database db = new Database();
 
+    public static String inputStreamAsString(InputStream stream) throws IOException {
+        BufferedReader br = new BufferedReader(new InputStreamReader(stream));
+        StringBuilder sb = new StringBuilder();
+        String line = null;
+
+        while ((line = br.readLine()) != null) {
+            sb.append(line + "\n");
+        }
+
+        br.close();
+        return sb.toString();
+    }
+    
+    public static Itinerary convertJSONtoItinerary(JSONObject itinerary) throws JSONException{
+        
+        //get trip header info from JSONObject
+        
+        JSONObject header = itinerary.getJSONObject("header");
+        String tripName = header.getString("tripName");
+        String where = header.getString("destination");
+        String when = header.getString("date");
+        String agent = header.getString("agent");
+        String agency = header.getString("agency");
+        String firstAirport = header.getString("firstAirport");
+        
+        //initiate new itin with header info
+        Itinerary itin = new Itinerary(tripName, where, when, agent, agency, firstAirport);
+        
+        //get itinerary as JSONObject
+        JSONObject itineraryInfo = itinerary.getJSONObject("itineraryInfo");
+        
+        // set up initial transfer obj to first property from firstAirport
+        Transfer transferIN = new Transfer();
+        //get JSONArray of transferIN
+        JSONObject transferINseq = itineraryInfo.getJSONObject("transferIN");
+        JSONArray transferINarray = transferINseq.getJSONArray("legs");
+        
+        // iterate through transferLegs of transferIN
+        for(int i=0; i<transferINarray.length(); i++){
+            TransferLeg leg = new TransferLeg();
+            leg.setFrom(transferINarray.getJSONObject(i).getString("from"));
+            leg.setTo(transferINarray.getJSONObject(i).getString("to"));
+            leg.setMode(transferINarray.getJSONObject(i).getString("mode"));
+            transferIN.Legs.add(leg);
+        }
+        //set transferIN of itinerary as transferIN built by json object
+        itin.transferIN = transferIN;
+        
+        
+        //get JSONArray of trip segments
+        
+        JSONArray segments = itineraryInfo.getJSONArray("segments");
+        
+        //iterate through segments
+        for(int i=0; i<segments.length(); i++){
+            
+            Segment tripSegment = new Segment();
+            JSONArray dayList = segments.getJSONObject(i).getJSONArray("dayList");
+            
+            //iterate through list of days and add to trip segment
+            for(int j=0; j<dayList.length(); j++){
+               
+                Day day = new Day();
+
+                day.setPrivate(dayList.getJSONObject(j).getBoolean("isPrivate"));
+                day.setDayHeader(dayList.getJSONObject(j).getString("dayHeader"));
+                day.setHeader(dayList.getJSONObject(j).getString("header"));
+                day.setBody(dayList.getJSONObject(j).getString("body"));
+                day.setProp(dayList.getJSONObject(j).getString("prop"));
+                day.setRoom(dayList.getJSONObject(j).getString("room"));
+                day.setWeb(dayList.getJSONObject(j).getString("web"));
+                day.setMeals(dayList.getJSONObject(j).getString("meals"));
+
+                tripSegment.DayList.add(day);
+                
+            }
+            
+            //set nights and room type for segment
+            tripSegment.setNights(segments.getJSONObject(i).getInt("nights"));
+            tripSegment.setRoomType(segments.getJSONObject(i).getString("roomtype"));
+        
+            //set property
+            
+            Property prop = new Property();
+            
+            prop.setName(segments.getJSONObject(i).getJSONObject("property").getString("name"));
+            prop.setCity(segments.getJSONObject(i).getJSONObject("property").getString("city"));
+            prop.setCountry(segments.getJSONObject(i).getJSONObject("property").getString("country"));
+            prop.setInclusions(segments.getJSONObject(i).getJSONObject("property").getString("inclusions"));
+            prop.setNotes(segments.getJSONObject(i).getJSONObject("property").getString("notes"));
+            prop.setType(segments.getJSONObject(i).getJSONObject("property").getString("type"));
+            prop.setWebpage(segments.getJSONObject(i).getJSONObject("property").getString("webpage"));
+            prop.setAirstrip(segments.getJSONObject(i).getJSONObject("property").getString("airstrip"));
+       
+            tripSegment.setProperty(prop);
+            
+            //add segment to segment list of itinerary
+            
+            itin.SegmentList.add(tripSegment);
+        }
+        
+        // set up initial transfer obj to first property from firstAirport
+        Transfer transferOUT = new Transfer();
+        //get JSONArray of transferOUT
+        JSONObject transferOUTseq = itineraryInfo.getJSONObject("transferOUT");
+        JSONArray transferOUTarray = transferOUTseq.getJSONArray("legs");
+        
+        // iterate through transferLegs of transferOUT
+        for(int i=0; i<transferOUTarray.length(); i++){
+            TransferLeg leg = new TransferLeg();
+            leg.setFrom(transferOUTarray.getJSONObject(i).getString("from"));
+            leg.setTo(transferOUTarray.getJSONObject(i).getString("to"));
+            leg.setMode(transferOUTarray.getJSONObject(i).getString("mode"));
+            transferOUT.Legs.add(leg);
+        }
+        
+        //set transferOUT of itinerary as transferOUT built by json object
+        itin.transferOUT = transferOUT;
+        
+        return itin;
+    }
+    
     static String getString(String s, UserInterface ui) {
         String r;
         while (true) {
@@ -159,7 +286,8 @@ public class ProposalCreator {
         return i;
     }
 
-    static Transfer getTransferSequence(UserInterface ui, Property fromProperty, Property toProperty) {
+    /*
+    static Transfer getTransferSequence(Property fromProperty, Property toProperty) {
         String[] travelModes = {
             "Private road transfer",
             "Commercial flight",
@@ -250,6 +378,8 @@ public class ProposalCreator {
         return transfer;
     }
 
+    */
+    
     static String getTravelString(Transfer transfer, String agency, Property property) {
         String travelString = "";
         //System.out.println("getting travel mode");
@@ -847,157 +977,6 @@ public class ProposalCreator {
         return proposal;
     }
 
-    static Itinerary inputProposal(String agency, List<Property> PropertyList,
-            UserInterface ui) throws IOException {
-
-        int lim = PropertyList.size();
-        Property property = PropertyList.get(0);
-        NumberConverter conv = new NumberConverter();
-
-        String tripName, where, when, agent, firstAirport;
-        String propertySearchTerm, roomType, activityCategory;
-
-        // get name, where, when
-        tripName = getString("the trip name", ui);
-        where = getString("the destination", ui);
-        when = getString("the month/s and year", ui);
-        agent = getString("the " + agency + " agent",ui);
-        firstAirport = getString("the arrival airport",ui);
-        // new Itinerary object
-        Itinerary itin = new Itinerary(tripName, where, when, agent, agency, firstAirport);
-        
-        Transfer transferIN = new Transfer();
-
-        transferIN = getTransferSequence(ui,null,null);
-        itin.transferIN=transferIN;
-        
-        int n = 0;
-        int daysComplete = 0;
-        boolean numberNeeded = true;
-        boolean itinComplete = false;
-        boolean gotProperty = false;
-
-        while (!itinComplete) {
-            Segment currSegment = new Segment();
-            gotProperty = false;
-            boolean isPrivate = false;
-            boolean allDaysSame = false;
-            numberNeeded = true;
-            
-            propertySearchTerm = getString("the property name", ui);
-            if (propertySearchTerm == null) {
-                return null;
-            }
-            
-
-            property = searchProperty(propertySearchTerm, PropertyList);
-
-            // property not found
-            if (property == null) {
-                System.out.println(propertySearchTerm + " was not found.\n\n");
-                // checks if similar results
-                List<Integer> SimilarResults = checkSimilarity(propertySearchTerm, PropertyList);
-                System.out.println("Size of similar results: " + SimilarResults.size());
-                if (SimilarResults.size() > 0) { //if there are similar results
-                    String[] similarNames = populateNameList(SimilarResults, PropertyList);
-                    String supposedName = ui.selectItem(similarNames, "Property not found, please choose:");
-                    if (supposedName.equals("New Property")) {
-                        property = buildNewProperty(ui);
-                        PropertyList.add(property);
-                        gotProperty = true;
-                    } else {
-                        //otherwise, the user selected the property they meant to say
-                        property = PropertyList.get(SimilarResults.get(Arrays.asList(similarNames).indexOf(supposedName)));
-                        gotProperty = true;
-                    }
-                } // if there were no similar results
-                else {
-                    String cmds[] = {"Yes", "No"};
-                    // ask if want to enter as new database entry
-                    String prompt = ("No matching property, enter new database entry for \"" + propertySearchTerm + "\"?");
-                    int choice = ui.getCommand(cmds, prompt);
-                    // if yes then build new property and continue with loop
-                    if (choice == 0) {
-                        property = buildNewProperty(ui);
-                    }
-                    if (choice == 1) {
-                        gotProperty = false;
-                    }
-                }
-
-            } else {
-                gotProperty = true;
-            }
-      
-
-            if (gotProperty == true) {
-                currSegment.setProperty(property);
-
-                while (numberNeeded) {
-                    numberNeeded = false;
-                    try {
-                        n = Integer.parseInt(getString("the number of nights", ui));
-                    } catch (Exception e) {
-                        System.err.println("The Number was not an integer");
-                        numberNeeded = true;
-                    }
-                }
-
-                currSegment.setNights(n);
-                currSegment.setRoomType(getString("the room type", ui));
-
-                /*the general idea here is to basically break the itinerary into days and save those days
-                in an array as an "itinerary" along with other data. The MAIN IDEA 
-                is that the program should be able to build the proposal at any given
-                time with just being passed in the "itin" object, so make sure to save
-                all the data.*/
-                for (int i = 0; i < n; i++, daysComplete++) {
-                    Day currDay = new Day();
-
-                    String inclusions = property.getInclusions();
-
-                    if (i == 0) {
-                        if (!allDaysSame) {
-                            activityCategory = activityCategory(property, ui, true);
-                            isPrivate = activityCategory.equals("private");
-                            allDaysSame = !activityCategory.equals("mixed");
-                            currDay.setPrivate(isPrivate);
-                        }
-                    } else if (i > 0) {
-                        if (allDaysSame) {
-                            currDay.setPrivate(isPrivate);
-                        } else {
-                            activityCategory = activityCategory(property, ui, false);
-                            isPrivate = activityCategory.equals("private");
-                            currDay.setPrivate(isPrivate);
-                        }
-                    }
-                    currSegment.DayList.add(currDay);
-                }
-
-                System.out.println("Segment input.");
-                int iCurrSegment = itin.SegmentList.indexOf(currSegment);
-                Transfer transferSequence = new Transfer();
-                if (iCurrSegment > 0) {
-                    transferSequence = getTransferSequence(ui, itin.SegmentList.get(iCurrSegment-1).property, currSegment.property);
-                } else {
-                    transferSequence = getTransferSequence(ui, null, currSegment.property);
-                }
-                currSegment.setTransferOut(transferSequence);
-                if (transferSequence.Legs.isEmpty()) {
-                    itinComplete = true;
-                }
-                itin.SegmentList.add(currSegment);
-            }
-
-        }
-        Transfer transferOUT = new Transfer();
-        transferOUT = getTransferSequence(ui,null,null);
-        itin.transferOUT=transferOUT;
-        
-        return itin;
-    }
-
     static List<Integer> checkSimilarity(String propname, List<Property> properties) {
         double ratio = 100.0;
         int difference;
@@ -1022,21 +1001,45 @@ public class ProposalCreator {
      * @param args the command line arguments
      * @throws java.io.FileNotFoundException
      */
-    public static void main(String[] args) throws FileNotFoundException, IOException {
+    public static void main(String[] args) throws FileNotFoundException, IOException, JSONException {
+        
+        ServerSocket server;
+        Socket client;
+        InputStream input;
+        JSONObject itinJSON = null;
+        
+        try {
+            server = new ServerSocket(1010);
+            client = server.accept();
 
+            input = client.getInputStream();
+            String inputString = inputStreamAsString(input);
+
+            itinJSON = new JSONObject(inputString);
+            
+            System.out.println(inputString);
+            
+
+            client.close();
+            server.close();
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+        }
+        
         //  set up GUI
         UserInterface ui = new GUI();
 
         // Load properties into arraylist
         List<Property> PropertyList = db.loadProperties();
 
+        Itinerary itin = convertJSONtoItinerary(itinJSON);
         // start taking in properties from user
-        Itinerary newProposal = inputProposal("Travel Beyond", PropertyList, ui);
-        if(newProposal!=null){
-            printProposalEmailHTML(newProposal);
-            printProposalWordHTML(newProposal);
+        if(itin!=null){
+            printProposalEmailHTML(itin);
+            printProposalWordHTML(itin);
         }
-        saveItinerary(newProposal);
+        saveItinerary(itin);
 
     }
 
