@@ -1003,6 +1003,8 @@ public class ProposalCreator {
      */
     public static void main(String[] args) throws FileNotFoundException, IOException, JSONException {
         
+    	
+    	// test json listening
         ServerSocket server;
         Socket client;
         InputStream input;
